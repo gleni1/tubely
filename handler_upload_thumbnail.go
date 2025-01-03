@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"net/http"
   "io"
+  "encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
 )
+
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	videoIDString := r.PathValue("videoID")
@@ -44,8 +46,8 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
   mediaType := header.Header["Content-Type"][0]
 
-  var vidData []byte
-  vidData, err = io.ReadAll(file)
+  var imgData []byte
+  imgData, err = io.ReadAll(file)
   if err != nil {
     respondWithError(w, http.StatusBadRequest, "Unable to read image data into slice", err)
     return
@@ -62,14 +64,18 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
     return
   }
 
-  thmb := thumbnail{
-    data:      vidData,
-    mediaType: mediaType,
-  }
+//  thmb := thumbnail{
+//    data:      imgData,
+//    mediaType: mediaType,
+//  }
 
-  videoThumbnails[video.ID] = thmb
+  //videoThumbnails[video.ID] = thmb
 
-  newThumbnail := fmt.Sprintf("http://localhost:%d/api/thumbnails/%d", cfg.port, video.ID)
+//  newThumbnail := fmt.Sprintf("http://localhost:%d/api/thumbnails/%d", cfg.port, video.ID)
+   
+  str := base64.StdEncoding.EncodeToString(imgData)
+  newThumbnail := fmt.Sprintf("data:%s;base64,%s", mediaType, str)
+  
   video.ThumbnailURL = &newThumbnail
 
   err = cfg.db.UpdateVideo(video)
