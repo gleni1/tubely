@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
   "io"
-  "encoding/base64"
+  "os"
+  "strings"
+  _ "encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -44,14 +46,15 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
   }
   defer file.Close()
 
-  mediaType := header.Header["Content-Type"][0]
 
-  var imgData []byte
-  imgData, err = io.ReadAll(file)
-  if err != nil {
-    respondWithError(w, http.StatusBadRequest, "Unable to read image data into slice", err)
-    return
-  }
+//  var imgData []byte
+//  imgData, err = io.ReadAll(file)
+//  if err != nil {
+//    respondWithError(w, http.StatusBadRequest, "Unable to read image data into slice", err)
+//    return
+//  }
+
+  mediaType := strings.Split((header.Header["Content-Type"][0]), "/")[1]
 
   video, err := cfg.db.GetVideo(videoID)
   if err != nil {
@@ -65,8 +68,21 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
   }
 
    
-  str := base64.StdEncoding.EncodeToString(imgData)
-  newThumbnail := fmt.Sprintf("data:%s;base64,%s", mediaType, str)
+  filePath := fmt.Sprintf("assets/%s.%s", videoID, mediaType)
+  newFile, err := os.Create(filePath)
+  if err != nil {
+    fmt.Println("Error creating file:", err)
+    return
+  }
+  defer newFile.Close()
+
+  if _, err := io.Copy(newFile, file); err != nil {
+    fmt.Println("Error copying file content", err)
+    return
+  }
+
+
+  newThumbnail := fmt.Sprintf("http://localhost:%d/%s", cfg.port, filePath)
   
   video.ThumbnailURL = &newThumbnail
 
