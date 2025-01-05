@@ -5,7 +5,8 @@ import (
 	"net/http"
   "io"
   "os"
-  "strings"
+  "mime"
+  _ "strings"
   _ "encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -54,7 +55,17 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 //    return
 //  }
 
-  mediaType := strings.Split((header.Header["Content-Type"][0]), "/")[1]
+//  media := strings.Split((header.Header["Content-Type"][0]), "/")[1]
+
+  mediaType, _, err := mime.ParseMediaType(header.Header["Content-Type"][0])
+  if err != nil {
+    respondWithError(w, http.StatusBadRequest, "Error while parsing media type", err)
+    return
+  } 
+  if mediaType != "image/jpeg" && mediaType != "image/png" {
+    respondWithError(w, http.StatusBadRequest, "Media type not allowed", err)
+    return
+  }
 
   video, err := cfg.db.GetVideo(videoID)
   if err != nil {
