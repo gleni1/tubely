@@ -82,7 +82,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
   defer os.Remove(f.Name())
   defer f.Close()
 
-  if _, err := io.Copy(f, file); err != nil {
+  if _, err := io.Copy(file, f); err != nil {
     respondWithError(w, http.StatusInternalServerError, "Couldn't copy content from mulitple-part file to temp new file", err)
     return
   }
@@ -100,16 +100,15 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
   key := hex.EncodeToString(keyBytes) + ".mp4"
 
   putObjectInput := &s3.PutObjectInput {
-    Bucket:       strPtr(cfg.s3Bucket),
+    Bucket:       cfg.s3Bucket,
     Key:          &key,
     Body:         f,
-    ContentType:  strPtr("video/mp4"),
+    ContentType:  "video/mp4",
   }
 
   _, err = cfg.s3Client.PutObject(context.TODO(), putObjectInput)
   if err != nil {
-    respondWithError(w, http.StatusInternalServerError, "Failed to upload to S3:", err)
-    return 
+    return fmt.Errorf("failed to upload to S3: %w", err)
   }
 
 
@@ -122,8 +121,4 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	respondWithJSON(w, http.StatusOK, video)
-}
-
-func strPtr(s string) *string {
-  return &s
 }
