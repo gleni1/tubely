@@ -6,7 +6,10 @@ import (
 	"mime"
   "context"
   "fmt"
-	"os"
+	"bytes"
+  "encoding/json"
+  "os"
+  "os/exec"
   "encoding/hex"
   "math/rand"
 
@@ -92,12 +95,19 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
     return
   }
 
+  aspectRatio, err := getVideoAspectRatio(f.Name())
+  if err != nil {
+    respondWithError(w, http.StatusInternalServerError, "Error getting aspect ratio: ", err)
+    return
+  }
+
+
   keyBytes := make([]byte, 16)
   if _, err := rand.Read(keyBytes); err != nil {
     respondWithError(w, http.StatusInternalServerError, "Err: ", err)
     return
   }
-  key := hex.EncodeToString(keyBytes) + ".mp4"
+  key := aspectRatio + "/" + hex.EncodeToString(keyBytes) + ".mp4"
 
   putObjectInput := &s3.PutObjectInput {
     Bucket:       strPtr(cfg.s3Bucket),
@@ -126,4 +136,34 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 func strPtr(s string) *string {
   return &s
+}
+
+func getVideoAspectRatio(filePath string) (string, error) {
+  cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
+  var outBuffer bytes.Buffer 
+  cmd.Stdout = &outBuffer 
+  err := cmd.Run()
+  if err != nil {
+    return "", fmt.Errorf("error running ffprobe: %w", err)
+  }
+
+  var stream streamStruct 
+  decoder := json.NewDecoder(&outBuffer)
+  err = decoder.Decode(&stream)
+  if err != nil {
+    return "", fmt.Errorf("Error decoding the data into a json struct: %w", err)
+  }
+
+  var aspectRatio string
+  ratio := float64(stream.Streams[0].Width) / float64(stream.Streams[0].Height)
+
+  if ratio > 1.7 && ratio < 1.8 {
+      aspectRatio = "landscape" 
+  } else if ratio > 0.5 && ratio < 0.6 {
+      aspectRatio = "portrait" 
+  } else {
+      aspectRatio = "other"
+  }
+
+  return aspectRatio, nil
 }
